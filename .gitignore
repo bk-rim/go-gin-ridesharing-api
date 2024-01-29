@@ -1,0 +1,21 @@
+# directory structure
+/bin/
+/pkg/
+/vendor/
+
+# Compiled Object files
+*.exe
+*.out
+
+
+
+# IDE files
+.vscode/
+.idea/
+
+# env files
+.env
+
+
+# logs files
+*.log
