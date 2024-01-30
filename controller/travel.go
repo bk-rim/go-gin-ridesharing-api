@@ -2,46 +2,28 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	_ "github.com/lib/pq"
 
 	"api/allo-dakar/model"
-
-	"api/allo-dakar/database"
 )
 
 func CreateTravel(c *gin.Context) {
 
-	var travel model.TravelPost
+	var travel model.Travel
 	if err := c.BindJSON(&travel); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	row := database.DB.QueryRow(`INSERT INTO "travels" (id_driven, start, end_area, price, date_travel, start_time, end_time, places, phone, comment)
-	 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, travel.DriverId, travel.StartArea, travel.EndArea, travel.Price,
-		travel.Date, travel.StartTime, travel.EndTime, travel.Places, travel.Phone, travel.Comment)
+	travelCreated, err := travel.Save()
 
-	var id int64
-	err := row.Scan(&id)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-	travelCreated := model.Travel{
-		Id:        int(id),
-		DriverId:  travel.DriverId,
-		StartArea: travel.StartArea,
-		EndArea:   travel.EndArea,
-		Price:     travel.Price,
-		Date:      travel.Date,
-		StartTime: travel.StartTime,
-		EndTime:   travel.EndTime,
-		Places:    travel.Places,
-		Phone:     travel.Phone,
-		Comment:   travel.Comment,
 	}
 
 	c.IndentedJSON(http.StatusCreated, travelCreated)
@@ -49,26 +31,13 @@ func CreateTravel(c *gin.Context) {
 
 func GetTravels(c *gin.Context) {
 
-	rows, err := database.DB.Query(`SELECT * FROM "travels"`)
+	var travel model.Travel
+
+	travels, err := travel.FindAll()
 
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	}
-	defer rows.Close()
-
-	var travels []model.Travel
-	for rows.Next() {
-		var travelTemp model.Travel
-		err := rows.Scan(&travelTemp.Id, &travelTemp.DriverId, &travelTemp.StartArea, &travelTemp.EndArea, &travelTemp.Price, &travelTemp.Date,
-			&travelTemp.StartTime, &travelTemp.EndTime, &travelTemp.Places, &travelTemp.Phone, &travelTemp.Comment)
-		if err != nil {
-			panic(err)
-		}
-		travels = append(travels, travelTemp)
-	}
-
-	if err := rows.Err(); err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.IndentedJSON(http.StatusOK, travels)
@@ -78,26 +47,16 @@ func GetTravelsByStartAndEnd(c *gin.Context) {
 
 	start := c.Param("start")
 	end := c.Param("end")
-	rows, err := database.DB.Query(`SELECT * FROM "travels" WHERE start = $1 AND end_area = $2`, start, end)
+	var travel model.Travel
+
+	travels, err := travel.FindByStartAndEnd(start, end)
 
 	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	var travels []model.Travel
-	for rows.Next() {
-		var travelTemp model.Travel
-		err := rows.Scan(&travelTemp.Id, &travelTemp.DriverId, &travelTemp.StartArea, &travelTemp.EndArea, &travelTemp.Price, &travelTemp.Date,
-			&travelTemp.StartTime, &travelTemp.EndTime, &travelTemp.Places, &travelTemp.Phone, &travelTemp.Comment)
-		if err != nil {
-			panic(err)
+		if err.Error() == "No travels found" {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		}
-		travels = append(travels, travelTemp)
-	}
-
-	if err := rows.Err(); err != nil {
-		panic(err)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.IndentedJSON(http.StatusOK, travels)
@@ -108,26 +67,17 @@ func GetTravelsByStartAndEndAndDate(c *gin.Context) {
 	start := c.Param("start")
 	end := c.Param("end")
 	date := c.Param("date")
-	rows, err := database.DB.Query(`SELECT * FROM "travels" WHERE start = $1 AND end_area = $2 AND date_travel = $3`, start, end, date)
+
+	var travel model.Travel
+	travels, err := travel.FindByStartAndEndAndDate(start, end, date)
 
 	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	var travels []model.Travel
-	for rows.Next() {
-		var travelTemp model.Travel
-		err := rows.Scan(&travelTemp.Id, &travelTemp.DriverId, &travelTemp.StartArea, &travelTemp.EndArea, &travelTemp.Price, &travelTemp.Date,
-			&travelTemp.StartTime, &travelTemp.EndTime, &travelTemp.Places, &travelTemp.Phone, &travelTemp.Comment)
-		if err != nil {
-			panic(err)
+		if err.Error() == "No travels found" {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
 		}
-		travels = append(travels, travelTemp)
-	}
-
-	if err := rows.Err(); err != nil {
-		panic(err)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.IndentedJSON(http.StatusOK, travels)
@@ -136,26 +86,23 @@ func GetTravelsByStartAndEndAndDate(c *gin.Context) {
 func GetTravelsByIdDriver(c *gin.Context) {
 
 	idDriver := c.Param("idDriver")
-	rows, err := database.DB.Query(`SELECT * FROM "travels" WHERE id_driven = $1`, idDriver)
+
+	driverID, err := strconv.ParseInt(idDriver, 10, 64)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "Invalid driver ID"})
+		return
+	}
+
+	var travel model.Travel
+	travels, err := travel.FindByIdDriver(driverID)
 
 	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	var travels []model.Travel
-	for rows.Next() {
-		var travelTemp model.Travel
-		err := rows.Scan(&travelTemp.Id, &travelTemp.DriverId, &travelTemp.StartArea, &travelTemp.EndArea, &travelTemp.Price, &travelTemp.Date,
-			&travelTemp.StartTime, &travelTemp.EndTime, &travelTemp.Places, &travelTemp.Phone, &travelTemp.Comment)
-		if err != nil {
-			panic(err)
+		if err.Error() == "No travels found" {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
 		}
-		travels = append(travels, travelTemp)
-	}
-
-	if err := rows.Err(); err != nil {
-		panic(err)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.IndentedJSON(http.StatusOK, travels)
@@ -165,23 +112,20 @@ func DeleteTravel(c *gin.Context) {
 
 	idTravel := c.Param("idTravel")
 
-	rows, err := database.DB.Query(`SELECT * FROM "travels" WHERE id = $1`, idTravel)
-
+	travelID, err := strconv.ParseInt(idTravel, 10, 64)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "Invalid travel ID"})
 		return
 	}
 
-	if !rows.Next() {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"error": "Travel not found"})
-		return
-	}
-
-	defer rows.Close()
-
-	_, err = database.DB.Query(`DELETE FROM "travels" WHERE id = $1`, idTravel)
+	var travel model.Travel
+	err = travel.Delete(travelID)
 
 	if err != nil {
+		if err.Error() == "Travel not found" {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

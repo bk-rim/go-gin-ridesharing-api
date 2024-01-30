@@ -26,6 +26,30 @@ func (user *User) Save() (*User, error) {
 	return user, nil
 }
 
+func (user *User) FindAll() ([]User, error) {
+	rows, err := database.DB.Query(`SELECT * FROM "users"`)
+	if err != nil {
+		return []User{}, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var userTemp User
+		err := rows.Scan(&userTemp.Id, &userTemp.Username, &userTemp.Email, &userTemp.Password)
+		if err != nil {
+			return []User{}, err
+		}
+		users = append(users, userTemp)
+	}
+
+	if err := rows.Err(); err != nil {
+		return []User{}, err
+	}
+
+	return users, nil
+}
+
 func (user *User) BeforeSave() error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {

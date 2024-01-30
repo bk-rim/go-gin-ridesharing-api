@@ -36,7 +36,7 @@ func TestCreateTravel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	travel := model.TravelPost{
+	travel := model.Travel{
 		DriverId:  1,
 		StartArea: "StartArea",
 		EndArea:   "EndArea",
@@ -178,7 +178,7 @@ func TestDeleteTravel(t *testing.T) {
 	router := gin.Default()
 	router.DELETE("/travels/:idTravel", controller.DeleteTravel)
 
-	req, err := http.NewRequest("DELETE", "/travels/"+strconv.Itoa(int(idTravel)), nil)
+	req, err := http.NewRequest("DELETE", `/travels/`+strconv.Itoa(int(idTravel)), nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -227,6 +227,6 @@ func TestDeleteTravelWithWrongId(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 }
